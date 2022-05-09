@@ -5,6 +5,7 @@ import {
   Flex,
   Heading,
   Icon,
+  Link,
   Spinner,
   Table,
   Tbody,
@@ -15,29 +16,48 @@ import {
   Tr,
   useBreakpointValue,
 } from "@chakra-ui/react";
-import { NextPage } from "next";
-import { useQuery } from "react-query";
-import Link from "next/link";
-import { useEffect } from "react";
+import { GetServerSideProps, NextPage } from "next";
+import { QueryClient, useQuery } from "react-query";
+import NextLink from "next/link";
+import { useEffect, useState } from "react";
 import { RiAddLine, RiPencilLine } from "react-icons/ri";
 import { Header } from "../../components/Header";
 import Pagination from "../../components/Pagination";
 import { SideBar } from "../../components/Sidebar";
 import { User } from "../../services/mirage";
 import { api } from "../../services/api/api";
-import { useUsers } from "../../services/hooks/useUsers";
+import { getUsers, useUsers } from "../../services/hooks/useUsers";
+import { queryClient } from "../../services/queryClient";
 
 export interface UserData extends User {
   id: string;
 }
 
-const UsersList: NextPage = () => {
-  const { data, isLoading, isFetching, error } = useUsers();
+const UsersList: NextPage = ({ users }) => {
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isFetching, error } = useUsers(page, {
+    initialData: users,
+  });
 
   const isWideVersion = useBreakpointValue({
     base: false,
     lg: true,
   });
+
+  async function handlePrefetchUser(userId: number) {
+    await queryClient.prefetchQuery(
+      ["user", userId],
+      async () => {
+        const response = await api.get(`users/${userId}`);
+
+        return response.data;
+      },
+      {
+        staleTime: 1000 * 60 * 10, // 10 minutos
+      }
+    );
+  }
 
   return (
     <Box>
@@ -55,7 +75,7 @@ const UsersList: NextPage = () => {
               )}
             </Heading>
 
-            <Link href="/users/create" passHref>
+            <NextLink href="/users/create" passHref>
               <Button
                 as="a"
                 size="sm"
@@ -65,7 +85,7 @@ const UsersList: NextPage = () => {
               >
                 Criar novo usuário
               </Button>
-            </Link>
+            </NextLink>
           </Flex>
 
           {isLoading ? (
@@ -88,7 +108,7 @@ const UsersList: NextPage = () => {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {data?.map((user) => {
+                  {data?.users?.map((user) => {
                     return (
                       <Tr key={user.id}>
                         <Td px={["4", "4", "6"]}>
@@ -96,7 +116,12 @@ const UsersList: NextPage = () => {
                         </Td>
                         <Td>
                           <Box>
-                            <Text fontWeight="bold">{user.name}</Text>
+                            <Link
+                              color="purple.400"
+                              onMouseEnter={() => handlePrefetchUser(user.id)}
+                            >
+                              <Text fontWeight="bold">{user.name}</Text>
+                            </Link>
                             <Text fontSize="sm" color="gray.300">
                               {user.email}
                             </Text>
@@ -110,9 +135,9 @@ const UsersList: NextPage = () => {
               </Table>
 
               <Pagination
-                totalCountOfRegisters={200}
-                currentPage={3}
-                onPageChange={() => {}}
+                totalCountOfRegisters={data?.totalCount ?? 0}
+                currentPage={page}
+                onPageChange={setPage}
               />
             </>
           )}
@@ -120,6 +145,16 @@ const UsersList: NextPage = () => {
       </Flex>
     </Box>
   );
+};
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const { users, totalCount } = await getUsers(1);
+
+  return {
+    props: {
+      users,
+    },
+  };
 };
 
 export default UsersList;

@@ -4,11 +4,13 @@ import { NextPage } from "next";
 interface PaginationItemProps {
   isCurrent?: boolean;
   number: number;
+  onPageChange: (page: number) => void;
 }
 
 const PaginationItem: NextPage<PaginationItemProps> = ({
   isCurrent = false,
   number,
+  onPageChange,
 }) => {
   if (isCurrent) {
     return (
@@ -32,6 +34,7 @@ const PaginationItem: NextPage<PaginationItemProps> = ({
       w="4"
       bgColor="gray.700"
       _hover={{ bg: "gray.500" }}
+      onClick={() => onPageChange(number)}
     >
       {number}
     </Button>
